@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishShield AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PDF & Report Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        // Set the worker source for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .traffic-light {
+            width: 80px;
+            height: 220px;
+            background-color: #2d3748;
+            border-radius: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            padding: 20px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 2px solid #4a5568;
+        }
+        .light {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #4a5568;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.4);
+        }
+        .light.red.active { background-color: #ef4444; box-shadow: 0 0 20px #ef4444, inset 0 2px 5px rgba(0,0,0,0.4); }
+        .light.yellow.active { background-color: #f59e0b; box-shadow: 0 0 20px #f59e0b, inset 0 2px 5px rgba(0,0,0,0.4); }
+        .light.green.active { background-color: #22c55e; box-shadow: 0 0 20px #22c55e, inset 0 2px 5px rgba(0,0,0,0.4); }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        #explanation-list li, #attachment-list li {
+            border-left-width: 4px;
+            padding-left: 1rem;
+        }
+        
+        #explanation-list li.border-red-500, #attachment-list.border-red-500 li { border-color: #ef4444; }
+        #explanation-list li.border-yellow-500, #attachment-list.border-yellow-500 li { border-color: #f59e0b; }
+        #explanation-list li.border-green-500, #attachment-list.border-green-500 li { border-color: #22c55e; }
+
+        .btn-feedback, .btn-export {
+            transition: all 0.2s ease;
+        }
+        .btn-feedback:hover, .btn-export:hover {
+            transform: translateY(-2px);
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #drop-zone {
+            border: 2px dashed #4a5568;
+            transition: all 0.3s ease;
+        }
+        #drop-zone.drag-over {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .break-all {
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">PhishShield AI</h1>
+            <p class="text-gray-400 mt-2">Your AI-powered guardian against phishing attacks.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Left Column: Input & Secondary Results -->
+            <div class="space-y-8">
+                <!-- Input Card -->
+                <div class="glass-card p-6 flex flex-col">
+                    <h2 class="text-2xl font-semibold mb-4">Analyze Email</h2>
+                    <div id="input-area">
+                        <div id="drop-zone" class="relative rounded-lg p-8 text-center cursor-pointer mb-4">
+                            <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".eml, .txt, text/plain, .pdf, application/pdf">
+                            <div class="flex flex-col items-center justify-center">
+                                <svg class="w-12 h-12 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.33-2.33 3 3 0 013.75 5.613" /></svg>
+                                <p class="mt-2 text-gray-400"><span class="font-semibold text-blue-400">Click to upload</span> or drag and drop</p>
+                                <p class="text-xs text-gray-500">.EML, .TXT, or .PDF files</p>
+                                <p id="file-name" class="text-sm text-green-400 mt-2"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center my-4"><div class="flex-grow border-t border-gray-600"></div><span class="flex-shrink mx-4 text-gray-500">OR</span><div class="flex-grow border-t border-gray-600"></div></div>
+                        <p class="text-gray-400 mb-4">Paste the full email source (including headers) below.</p>
+                        <textarea id="email-input" class="w-full h-48 bg-gray-800 border border-gray-600 rounded-lg p-4 text-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y" placeholder="Return-Path: <...>&#10;From: security@yourbank.com..."></textarea>
+                    </div>
+                    <div id="action-buttons" class="mt-6 pt-6 border-t border-gray-700">
+                        <div class="flex space-x-4">
+                            <button id="analyze-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>Analyze</button>
+                            <button id="clear-btn" class="w-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Secondary Results in Left Column -->
+                <div id="left-secondary-results" class="hidden space-y-8">
+                    <div id="left-header-analysis-container" class="hidden glass-card p-6"></div>
+                    <div id="left-link-analysis-container" class="hidden glass-card p-6">
+                        <h3 class="text-xl font-semibold mb-3">Link Sandbox</h3>
+                        <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-700"><thead class="bg-gray-800"><tr><th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Link</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Destination</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Risk</th></tr></thead><tbody id="left-link-list" class="divide-y divide-gray-700"></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Verdict & Primary Results -->
+            <div id="results-container" class="glass-card p-6 flex flex-col items-center justify-start text-center">
+                <div id="initial-state" class="w-full">
+                    <h2 class="text-2xl font-semibold mb-4">Analysis Result</h2>
+                    <div class="traffic-light mx-auto"><div class="light red"></div><div class="light yellow"></div><div class="light green"></div></div>
+                    <p class="mt-4 text-gray-400">Results will appear here.</p>
+                </div>
+                <div id="loading-state" class="hidden w-full flex-col items-center justify-center"><div class="loader"></div><p class="mt-4 text-gray-400">Analyzing...</p></div>
+                <div id="result-state" class="hidden w-full space-y-6">
+                    <!-- Top section: Verdict -->
+                    <div>
+                        <h2 id="result-title" class="text-3xl font-bold mb-2"></h2>
+                        <p class="text-lg text-gray-400 mb-4">Confidence: <span id="confidence-score" class="font-semibold"></span></p>
+                        <div class="traffic-light mx-auto"><div id="result-red-light" class="light red"></div><div id="result-yellow-light" class="light yellow"></div><div id="result-green-light" class="light green"></div></div>
+                    </div>
+                    
+                    <div id="report-section" class="hidden">
+                        <a href="https://cybercrime.gov.in" target="_blank" class="w-full bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>Report to Indian Cybercrime Authority</a>
+                    </div>
+                    <div id="export-section" class="hidden flex space-x-2">
+                        <button id="export-pdf-btn" class="btn-export w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Export PDF</button>
+                        <button id="export-json-btn" class="btn-export w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Export JSON</button>
+                    </div>
+
+                    <!-- Primary analysis details -->
+                    <div class="space-y-6 w-full pt-4 text-left border-t border-gray-700 mt-6">
+                        <div id="content-findings-section" class="hidden text-left w-full">
+                           <h3 class="text-xl font-semibold mb-3">Key Content Findings:</h3>
+                           <ul id="explanation-list" class="space-y-3"></ul>
+                       </div>
+                        <div id="attachment-analysis-section" class="hidden w-full">
+                            <h3 class="text-xl font-semibold mb-3">Attachment Analyzer</h3>
+                            <ul id="attachment-list" class="space-y-3"></ul>
+                        </div>
+                        <div id="security-tips-section" class="hidden w-full bg-blue-900/30 p-4 rounded-lg">
+                            <h3 class="text-xl font-semibold mb-3 text-blue-300"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Education Mode: Security Tips</h3>
+                            <ul id="tips-list" class="space-y-2 list-disc list-inside text-blue-200"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Bottom section: Feedback -->
+                    <div id="feedback-section" class="pt-6 border-t border-gray-700 w-full">
+                        <h4 class="font-semibold mb-3">Was this analysis correct?</h4>
+                        <div class="flex justify-center space-x-4">
+                            <button class="btn-feedback bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Correct</button>
+                            <button class="btn-feedback bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Incorrect</button>
+                        </div>
+                        <p id="feedback-message" class="text-sm text-gray-400 mt-3"></p>
+                    </div>
+                </div>
+                <div id="error-state" class="hidden text-center"><h2 class="text-2xl font-semibold mb-4 text-red-500">Analysis Failed</h2><p class="text-gray-400">Could not analyze.</p><p id="error-message" class="text-sm text-red-400 mt-2 bg-gray-800 p-2 rounded"></p></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Globals ---
+        let lastAnalysisResult = null;
+        const { jsPDF } = window.jspdf;
+
+        // --- DOM Elements ---
+        const emailInput = document.getElementById('email-input');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileNameEl = document.getElementById('file-name');
+        
+        // Left Column Results
+        const leftSecondaryResults = document.getElementById('left-secondary-results');
+        const leftHeaderAnalysisContainer = document.getElementById('left-header-analysis-container');
+        const leftLinkAnalysisContainer = document.getElementById('left-link-analysis-container');
+        const leftLinkList = document.getElementById('left-link-list');
+        
+        // Right Column Results
+        const contentFindingsSection = document.getElementById('content-findings-section');
+        const explanationList = document.getElementById('explanation-list');
+        const attachmentAnalysisSection = document.getElementById('attachment-analysis-section');
+        const attachmentList = document.getElementById('attachment-list');
+        const securityTipsSection = document.getElementById('security-tips-section');
+        const tipsList = document.getElementById('tips-list');
+
+        const initialState = document.getElementById('initial-state');
+        const loadingState = document.getElementById('loading-state');
+        const resultState = document.getElementById('result-state');
+        const errorState = document.getElementById('error-state');
+        const errorMessage = document.getElementById('error-message');
+
+        const resultTitle = document.getElementById('result-title');
+        const confidenceScore = document.getElementById('confidence-score');
+        
+        const redLight = document.getElementById('result-red-light');
+        const yellowLight = document.getElementById('result-yellow-light');
+        const greenLight = document.getElementById('result-green-light');
+
+        const feedbackButtons = document.querySelectorAll('.btn-feedback');
+        const feedbackMessage = document.getElementById('feedback-message');
+        
+        const reportSection = document.getElementById('report-section');
+        const exportSection = document.getElementById('export-section');
+        const exportPdfBtn = document.getElementById('export-pdf-btn');
+        const exportJsonBtn = document.getElementById('export-json-btn');
+        
+        // --- Event Listeners ---
+        analyzeBtn.addEventListener('click', () => startAnalysis());
+        clearBtn.addEventListener('click', clearInterface);
+        exportPdfBtn.addEventListener('click', exportReportPDF);
+        exportJsonBtn.addEventListener('click', exportReportJSON);
+        
+        feedbackButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                feedbackMessage.textContent = "Thank you for your feedback! This will help improve future analyses.";
+                setTimeout(() => { feedbackMessage.textContent = ""; }, 4000);
+            });
+        });
+
+        ['dragover', 'dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, e => e.preventDefault()));
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('drag-over'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        // --- Functions ---
+        function handleFile(file) {
+            fileNameEl.textContent = `File: ${file.name}`;
+            emailInput.value = '';
+            const fileType = file.type, fileName = file.name.toLowerCase();
+            if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) handlePdfFile(file);
+            else if (fileType === 'text/plain' || fileName.endsWith('.txt') || fileName.endsWith('.eml')) handleTextFile(file);
+            else {
+                showError(`Unsupported file type: ${file.name}. Please use .eml, .txt, or .pdf.`);
+                fileNameEl.textContent = '';
+            }
+        }
+
+        function handleTextFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => startAnalysis(e.target.result);
+            reader.onerror = () => showError(`Error reading file: ${file.name}`);
+            reader.readAsText(file);
+        }
+
+        async function handlePdfFile(file) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const pdf = await pdfjsLib.getDocument(e.target.result).promise;
+                    let fullText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+                    }
+                    startAnalysis(fullText);
+                } catch (error) { showError("Could not read the PDF file."); }
+            };
+            reader.onerror = () => showError(`Error reading file: ${file.name}`);
+            reader.readAsArrayBuffer(file);
+        }
+        
+        function clearInterface() {
+            emailInput.value = '';
+            fileNameEl.textContent = '';
+            fileInput.value = null; 
+            lastAnalysisResult = null;
+
+            // Hide all results containers
+            [resultState, errorState, loadingState, reportSection, exportSection, contentFindingsSection, attachmentAnalysisSection, securityTipsSection, leftSecondaryResults, leftHeaderAnalysisContainer, leftLinkAnalysisContainer].forEach(el => el.classList.add('hidden'));
+            loadingState.classList.remove('flex');
+            
+            initialState.classList.remove('hidden');
+            feedbackMessage.textContent = '';
+            [emailInput, analyzeBtn].forEach(el => {
+                el.disabled = false;
+                el.classList.remove('opacity-50', 'cursor-not-allowed');
+            });
+        }
+
+        async function startAnalysis(textFromFile = null) {
+            const textToAnalyze = textFromFile || emailInput.value;
+            if (!textToAnalyze.trim()) { 
+                showError(`Please upload a file or paste email content to analyze.`);
+                return;
+            }
+            
+            clearInterface(); // Clear previous results before starting
+            initialState.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+            loadingState.classList.add('flex');
+
+            [analyzeBtn, emailInput].forEach(el => {
+                el.disabled = true;
+                el.classList.add('opacity-50', 'cursor-not-allowed');
+            });
+
+            try {
+                // Point to your Netlify Function endpoint
+                const functionUrl = '/.netlify/functions/analyze-email'; // Or '/api/analyze-email' if you use the redirect
+
+                const payload = {
+                    emailContent: textToAnalyze // Send the email content to your function
+                };
+
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Analysis failed: ${errorData.error || response.statusText}`);
+                }
+
+                const result = await response.json();
+                displayResults(result); // The function already returns parsed JSON
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                [analyzeBtn, emailInput].forEach(el => {
+                    el.disabled = false;
+                    el.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+            }
+        }
+
+        function showError(message) {
+            loadingState.classList.add('hidden');
+            loadingState.classList.remove('flex');
+            initialState.classList.add('hidden');
+            resultState.classList.add('hidden');
+            errorState.classList.remove('hidden');
+            errorMessage.textContent = message;
+        }
+        
+        function displayResults(result) {
+            lastAnalysisResult = result;
+            loadingState.classList.add('hidden');
+            loadingState.classList.remove('flex');
+            resultState.classList.remove('hidden');
+            exportSection.classList.remove('hidden');
+            
+            // --- Main Verdict (Right Column) ---
+            resultTitle.textContent = result.classification;
+            confidenceScore.textContent = `${(result.confidence * 100).toFixed(1)}%`;
+            
+            [redLight, yellowLight, greenLight].forEach(l => l.classList.remove('active'));
+            let titleColor = 'text-white', listBorderColor = 'border-gray-500';
+            reportSection.classList.add('hidden');
+            switch (result.classification.toLowerCase()) {
+                case 'phishing': redLight.classList.add('active'); titleColor = 'text-red-500'; listBorderColor = 'border-red-500'; reportSection.classList.remove('hidden'); break;
+                case 'suspicious': yellowLight.classList.add('active'); titleColor = 'text-yellow-500'; listBorderColor = 'border-yellow-500'; reportSection.classList.remove('hidden'); break;
+                case 'safe': greenLight.classList.add('active'); titleColor = 'text-green-500'; listBorderColor = 'border-green-500'; break;
+            }
+            resultTitle.className = `text-3xl font-bold mb-2 ${titleColor}`;
+            
+            // Show parent container for left-side results if any exist
+            if (result.headerAnalysis || result.analyzedLinks?.length > 0) {
+                leftSecondaryResults.classList.remove('hidden');
+            }
+
+            // --- Header Analysis (Left Column) ---
+            if (result.headerAnalysis) {
+                renderHeaderAnalysis(result.headerAnalysis, leftHeaderAnalysisContainer);
+                leftHeaderAnalysisContainer.classList.remove('hidden');
+            }
+
+            // --- Link Analysis (Left Column) ---
+            if (result.analyzedLinks?.length > 0) {
+                leftLinkList.innerHTML = '';
+                result.analyzedLinks.forEach(link => {
+                    const riskColor = link.risk === 'High' ? 'text-red-400' : link.risk === 'Medium' ? 'text-yellow-400' : 'text-green-400';
+                    leftLinkList.innerHTML += `<tr class="bg-gray-800/50"><td class="px-4 py-3 text-sm text-gray-300 break-all">${link.text}</td><td class="px-4 py-3 text-sm text-gray-300 break-all">${link.href}</td><td class="px-4 py-3 text-sm font-semibold ${riskColor}">${link.risk}<p class="font-normal text-xs text-gray-400">${link.reason}</p></td></tr>`;
+                });
+                leftLinkAnalysisContainer.classList.remove('hidden');
+            }
+
+            // --- Content Findings (Right Column) ---
+            explanationList.innerHTML = '';
+            result.explanation.forEach(item => {
+                const li = document.createElement('li');
+                li.className = `glass-card p-3 ${listBorderColor}`;
+                li.innerHTML = `<strong class="text-white">${item.feature}:</strong><p class="text-gray-300 text-sm">${item.details}</p>`;
+                explanationList.appendChild(li);
+            });
+            contentFindingsSection.classList.remove('hidden');
+
+            // --- Attachment Analysis (Right Column) ---
+            if (result.analyzedAttachments?.length > 0) {
+                attachmentList.innerHTML = '';
+                attachmentList.className = `space-y-3 ${listBorderColor}`;
+                result.analyzedAttachments.forEach(att => {
+                    attachmentList.innerHTML += `<li class="glass-card p-3"><strong class="text-white">${att.filename}</strong><p class="text-gray-300 text-sm">${att.reason}</p></li>`;
+                });
+                attachmentAnalysisSection.classList.remove('hidden');
+            }
+            
+            // --- Security Tips (Right Column) ---
+            if (result.securityTips?.length > 0) {
+                tipsList.innerHTML = '';
+                result.securityTips.forEach(tip => { tipsList.innerHTML += `<li>${tip}</li>`; });
+                securityTipsSection.classList.remove('hidden');
+            }
+        }
+        
+        function renderHeaderAnalysis(headerResult, targetElement) {
+            const isSuspicious = headerResult.assessment.status !== 'Authentic' || headerResult.domainMismatch.status === true;
+            const summaryColor = isSuspicious ? 'text-red-400' : 'text-green-400';
+            const summaryIcon = isSuspicious ? '❌' : '✅';
+            
+            const renderCheck = (check) => {
+                if (!check) return `<span class="text-gray-400">N/A</span>`;
+                const color = check.status === 'Pass' ? 'text-green-400' : check.status === 'Fail' ? 'text-red-400' : 'text-yellow-400';
+                return `<span class="${color}">${check.status}</span> <span class="text-gray-400 text-xs">(${check.reason || 'No details'})</span>`;
+            };
+
+            targetElement.innerHTML = `
+                <h3 class="text-xl font-semibold mb-3">Header Analysis:</h3>
+                <div class="border ${isSuspicious ? 'border-red-500/50' : 'border-green-500/50'} bg-gray-800/50 p-4 rounded-lg text-left">
+                    <h4 class="text-lg font-bold ${summaryColor} mb-3">${summaryIcon} Assessment: ${headerResult.assessment.status}</h4>
+                    <p class="text-sm text-gray-300 mb-4">${headerResult.assessment.summary}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div><strong>From:</strong> <span class="text-gray-300 break-all">${headerResult.from || 'N/A'}</span></div>
+                        <div><strong>To:</strong> <span class="text-gray-300 break-all">${headerResult.to || 'N/A'}</span></div>
+                        <div><strong>Return-Path:</strong> <span class="text-gray-300 break-all">${headerResult.returnPath || 'N/A'}</span></div>
+                        <div><strong>Reply-To:</strong> <span class="text-gray-300 break-all">${headerResult.replyTo || 'N/A'}</span></div>
+                        <div><strong>SPF Check:</strong> ${renderCheck(headerResult.spf)}</div>
+                        <div><strong>DKIM Check:</strong> ${renderCheck(headerResult.dkim)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function exportReportJSON() {
+            if (!lastAnalysisResult) return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lastAnalysisResult, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "PhishShield_Report.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function exportReportPDF() {
+            if (!lastAnalysisResult) return;
+            const doc = new jsPDF();
+            const res = lastAnalysisResult;
+            const pageMargin = 15;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const contentWidth = pageWidth - (pageMargin * 2);
+            let y = pageMargin + 5;
+            const lineHeight = 7; 
+
+            const addText = (text, x, yPos, options) => {
+                const lines = doc.splitTextToSize(text, options.maxWidth || contentWidth);
+                doc.text(lines, x, yPos, options);
+                return yPos + (lines.length * (lineHeight - 2));
+            };
+
+            const checkPageBreak = (yPos, requiredHeight) => {
+                if (yPos + requiredHeight > doc.internal.pageSize.getHeight() - pageMargin) {
+                    doc.addPage();
+                    return pageMargin;
+                }
+                return yPos;
+            };
+
+            doc.setFontSize(22);
+            doc.text("PhishShield AI Analysis Report", pageWidth / 2, y, { align: 'center' });
+            y += 15;
+
+            doc.setFontSize(16);
+            doc.text(`Classification: ${res.classification}`, pageMargin, y);
+            doc.text(`Confidence: ${(res.confidence * 100).toFixed(1)}%`, pageWidth - pageMargin, y, { align: 'right' });
+            y += 8;
+            doc.setLineWidth(0.5);
+            doc.line(pageMargin, y, pageWidth - pageMargin, y);
+            y += 10;
+
+            doc.setFontSize(14);
+            doc.text("Key Content Findings:", pageMargin, y);
+            y += lineHeight;
+            doc.setFontSize(11);
+            res.explanation.forEach(exp => {
+                const textBlock = `- ${exp.feature}: ${exp.details}`;
+                const lines = doc.splitTextToSize(textBlock, contentWidth - 5);
+                y = checkPageBreak(y, lines.length * lineHeight);
+                y = addText(textBlock, pageMargin + 5, y, { maxWidth: contentWidth - 5 });
+                y += 5;
+            });
+
+            if (res.headerAnalysis) {
+                y = checkPageBreak(y, 20);
+                y += 5;
+                doc.setFontSize(14);
+                doc.text("Header Analysis:", pageMargin, y);
+                y += lineHeight;
+                doc.setFontSize(11);
+                const headerInfo = [
+                    `Assessment: ${res.headerAnalysis.assessment.status} - ${res.headerAnalysis.assessment.summary}`,
+                    `From: ${res.headerAnalysis.from}`, `Return-Path: ${res.headerAnalysis.returnPath}`,
+                    `SPF: ${res.headerAnalysis.spf.status} (${res.headerAnalysis.spf.reason})`,
+                    `DKIM: ${res.headerAnalysis.dkim.status} (${res.headerAnalysis.dkim.reason})`
+                ];
+                headerInfo.forEach(info => {
+                    const lines = doc.splitTextToSize(info, contentWidth - 5);
+                    y = checkPageBreak(y, lines.length * lineHeight);
+                    y = addText(info, pageMargin + 5, y, { maxWidth: contentWidth - 5 });
+                    y += 3;
+                });
+                y += 3;
+            }
+            
+            if (res.analyzedLinks?.length > 0) {
+                y = checkPageBreak(y, 20);
+                y += 5;
+                doc.setFontSize(14);
+                doc.text("Link Analysis:", pageMargin, y);
+                y += lineHeight;
+                doc.setFontSize(10);
+                res.analyzedLinks.forEach(link => {
+                    const linkBlock = `Risk: ${link.risk} - Text: "${link.text}" points to: ${link.href}\nReason: ${link.reason}`;
+                    const lines = doc.splitTextToSize(linkBlock, contentWidth - 5);
+                    y = checkPageBreak(y, lines.length * lineHeight);
+                    y = addText(linkBlock, pageMargin + 5, y, { maxWidth: contentWidth - 5 });
+                    y += 6;
+                });
+            }
+
+            if (res.securityTips?.length > 0) {
+                y = checkPageBreak(y, 20);
+                y += 5;
+                doc.setFontSize(14);
+                doc.text("Actionable Security Tips:", pageMargin, y);
+                y += lineHeight;
+                doc.setFontSize(11);
+                res.securityTips.forEach(tip => {
+                    const tipBlock = `- ${tip}`;
+                    const lines = doc.splitTextToSize(tipBlock, contentWidth - 5);
+                    y = checkPageBreak(y, lines.length * lineHeight);
+                    y = addText(tipBlock, pageMargin + 5, y, { maxWidth: contentWidth - 5 });
+                    y += 5;
+                });
+            }
+            
+            doc.save('PhishShield_Report.pdf');
+        }
+
+    </script>
+</body>
+</html>
